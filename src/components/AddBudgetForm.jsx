@@ -6,6 +6,7 @@ import { Form, useFetcher } from "react-router-dom"
 
 // library imports
 import { CurrencyDollarIcon } from "@heroicons/react/24/solid"
+import { CurrencyRupeeIcon } from "@heroicons/react/20/solid";
 
 const AddBudgetForm = () => {
   const fetcher = useFetcher();
