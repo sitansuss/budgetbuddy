@@ -26,28 +26,29 @@ import Dashboard from "./pages/Dashboard";
 import ErrorPage from "./pages/Error";
 import BudgetPage, { budgetAction, budgetLoader } from "./pages/BudgetPage";
 import ExpensesPage, { expensesAction, expensesLoader } from "./pages/ExpensesPage";
-
-// UPDATE: Import the new Login and Signup pages and their actions
-import LoginPage, { loginAction } from './pages/LoginPage';
-import SignupPage, { signupAction } from './pages/SignupPage';
+import AuthPage, { authAction } from "./pages/AuthPage";
 
 // Dashboard Loader & Action
 export async function dashboardLoader() {
-  const { data: { session } } = await supabase.auth.getSession();
-  const userName = session?.user?.user_metadata?.userName;
-  const email = session?.user?.email;
-
   const budgets = await getBudgets();
   const expenses = await getExpenses();
-  
-  return { userName, email, budgets, expenses };
+  const { data: { session } } = await supabase.auth.getSession();
+  const userName = session?.user?.user_metadata?.userName;
+  return { userName, budgets, expenses };
 }
 
 export async function dashboardAction({ request }) {
   await waait();
   const data = await request.formData();
   const { _action, ...values } = Object.fromEntries(data);
-  
+
+  if (_action === "newUser") {
+    try {
+      const { error } = await supabase.auth.updateUser({ data: { userName: values.userName } });
+      if (error) throw error;
+      return toast.success(`Welcome, ${values.userName}`);
+    } catch (e) { throw new Error("There was a problem saving your name."); }
+  }
   if (_action === "createBudget") {
     try {
       const budgets = await getBudgets();
@@ -57,9 +58,7 @@ export async function dashboardAction({ request }) {
         existingBudgetsCount: budgets.length,
       });
       return toast.success("Budget created!");
-    } catch (e) {
-      throw new Error("There was a problem creating your budget.");
-    }
+    } catch (e) { throw new Error("There was a problem creating your budget."); }
   }
   if (_action === "createExpense") {
     try {
@@ -69,17 +68,13 @@ export async function dashboardAction({ request }) {
         budgetId: values.newExpenseBudget,
       });
       return toast.success(`Expense ${values.newExpense} created!`);
-    } catch (e) {
-      throw new Error("There was a problem creating your expense.");
-    }
+    } catch (e) { throw new Error("There was a problem creating your expense."); }
   }
   if (_action === "deleteExpense") {
     try {
       await deleteExpense(values.expenseId);
       return toast.success("Expense deleted!");
-    } catch (e) {
-      throw new Error("There was a problem deleting your expense.");
-    }
+    } catch (e) { throw new Error("There was a problem deleting your expense."); }
   }
   return null;
 }
@@ -109,30 +104,30 @@ const router = createBrowserRouter([
         index: true,
         element: <Dashboard />,
         loader: async () => {
-          await protectedLoader();
+          // FIX: Check the result of the protectedLoader
+          const protection = await protectedLoader();
+          if (protection) {
+            return protection; // Return the redirect immediately if it exists
+          }
+          // Otherwise, continue to the normal loader
           return dashboardLoader();
         },
         action: dashboardAction,
         errorElement: <ErrorPage />,
       },
-      // UPDATE: Replaced the old /login route with these two new routes
       {
         path: "login",
-        element: <LoginPage />,
-        action: loginAction,
-        loader: publicLoader,
-      },
-      {
-        path: "signup",
-        element: <SignupPage />,
-        action: signupAction,
+        element: <AuthPage />,
+        action: authAction,
         loader: publicLoader,
       },
       {
         path: "budget/:id",
         element: <BudgetPage />,
         loader: async ({ params }) => {
-          await protectedLoader();
+          // FIX: Apply the same protection pattern here
+          const protection = await protectedLoader();
+          if (protection) return protection;
           return budgetLoader({ params });
         },
         action: budgetAction,
@@ -148,7 +143,9 @@ const router = createBrowserRouter([
         path: "expenses",
         element: <ExpensesPage />,
         loader: async () => {
-          await protectedLoader();
+          // FIX: And here too
+          const protection = await protectedLoader();
+          if (protection) return protection;
           return expensesLoader();
         },
         action: expensesAction,
