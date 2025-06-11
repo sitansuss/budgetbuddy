@@ -1,32 +1,42 @@
+// src/pages/ExpensesPage.jsx
+
 // rrd imports
 import { useLoaderData } from "react-router-dom";
 
-// library import
+// library
 import { toast } from "react-toastify";
 
-// component imports
+// components
 import Table from "../components/Table";
 
 // helpers
-import { deleteItem, fetchData } from "../helpers";
+// Import the new async helpers
+import { getBudgets, getExpenses, deleteExpense } from "../helpers";
 
-// loader
+// loader for the expenses page
 export async function expensesLoader() {
-  const expenses = fetchData("expenses");
-  return { expenses };
+  const expenses = await getExpenses();
+  const budgets = await getBudgets();
+
+  const expensesWithBudget = expenses.map((expense) => {
+    const budget = budgets.find((b) => b.id === expense.budget_id);
+    return { ...expense, budget: budget };
+  });
+
+  return { expenses: expensesWithBudget };
 }
 
-// action
+// =============================================================
+// ACTION TO HANDLE DELETING AN EXPENSE FROM THIS PAGE
+// =============================================================
 export async function expensesAction({ request }) {
   const data = await request.formData();
   const { _action, ...values } = Object.fromEntries(data);
 
   if (_action === "deleteExpense") {
     try {
-      deleteItem({
-        key: "expenses",
-        id: values.expenseId,
-      });
+      // Use the new async deleteExpense helper
+      await deleteExpense(values.expenseId);
       return toast.success("Expense deleted!");
     } catch (e) {
       throw new Error("There was a problem deleting your expense.");
@@ -45,10 +55,12 @@ const ExpensesPage = () => {
           <h2>
             Recent Expenses <small>({expenses.length} total)</small>
           </h2>
-          <Table expenses={expenses} />
+          <div className="table">
+            <Table expenses={expenses} />
+          </div>
         </div>
       ) : (
-        <p>No Expenses to show</p>
+        <p>No expenses to show</p>
       )}
     </div>
   );

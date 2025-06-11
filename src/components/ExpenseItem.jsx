@@ -1,44 +1,44 @@
-// rrd imports
-import { Link, useFetcher } from "react-router-dom";
+// src/components/ExpenseItem.jsx
 
-// library import
+// rrd imports
+import { Link, Form } from "react-router-dom";
+
+// library
 import { TrashIcon } from "@heroicons/react/24/solid";
 
-// helper imports
-import {
-  formatCurrency,
-  formatDateToLocaleString,
-  getAllMatchingItems,
-} from "../helpers";
+// helpers
+import { formatCurrency, formatDateToLocaleString } from "../helpers";
 
-const ExpenseItem = ({ expense, showBudget }) => {
-  const fetcher = useFetcher();
-
-  const budget = getAllMatchingItems({
-    category: "budgets",
-    key: "id",
-    value: expense.budgetId,
-  })[0];
+// This component now expects the 'expense' object to have a 'budget' property nested inside.
+const ExpenseItem = ({ expense, showBudget = true }) => {
+  const { budget } = expense;
 
   return (
     <>
       <td>{expense.name}</td>
       <td>{formatCurrency(expense.amount)}</td>
-      <td>{formatDateToLocaleString(expense.createdAt)}</td>
+      <td>{formatDateToLocaleString(expense.created_at)}</td>
       {showBudget && (
         <td>
-          <Link
-            to={`/budget/${budget.id}`}
-            style={{
-              "--accent": budget.color,
-            }}
-          >
-            {budget.name}
-          </Link>
+          {/* Check if budget exists before trying to access its properties */}
+          {budget ? (
+            <Link
+              to={`/budget/${budget.id}`}
+              style={{
+                // Use HSL color stored in the budget
+                "--accent": `hsl(${budget.color})`,
+              }}
+            >
+              {budget.name}
+            </Link>
+          ) : (
+            // Display a dash if for some reason the budget isn't found
+            <span>-</span>
+          )}
         </td>
       )}
       <td>
-        <fetcher.Form method="post">
+        <Form method="post">
           <input type="hidden" name="_action" value="deleteExpense" />
           <input type="hidden" name="expenseId" value={expense.id} />
           <button
@@ -48,7 +48,7 @@ const ExpenseItem = ({ expense, showBudget }) => {
           >
             <TrashIcon width={20} />
           </button>
-        </fetcher.Form>
+        </Form>
       </td>
     </>
   );

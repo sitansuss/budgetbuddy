@@ -1,46 +1,58 @@
 // rrd imports
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData, Form } from "react-router-dom";
 
 // library
 import { toast } from "react-toastify";
 
 // components
-import AddExpenseForm from "../components/AddExpenseForm";
 import BudgetItem from "../components/BudgetItem";
+import AddExpenseForm from "../components/AddExpenseForm";
 import Table from "../components/Table";
 
 // helpers
-import { createExpense, deleteItem, getAllMatchingItems } from "../helpers";
+// =============================================================
+// UPDATED IMPORTS: Use the new async helpers
+// =============================================================
+import {
+  createExpense,
+  deleteExpense,
+  getBudgets,
+  getExpenses,
+  calculateSpentByBudget,
+} from "../helpers";
 
-// loader
+// loader for the budget page
 export async function budgetLoader({ params }) {
-  const budget = await getAllMatchingItems({
-    category: "budgets",
-    key: "id",
-    value: params.id,
-  })[0];
+  // Fetch all data required for this page
+  const allBudgets = await getBudgets();
+  const allExpenses = await getExpenses();
 
-  const expenses = await getAllMatchingItems({
-    category: "expenses",
-    key: "budgetId",
-    value: params.id,
-  });
+  // Find the specific budget for this page
+  const budget = allBudgets.find((b) => b.id === params.id);
 
   if (!budget) {
     throw new Error("The budget you’re trying to find doesn’t exist");
   }
 
-  return { budget, expenses };
+  // Filter expenses to only those that belong to this budget
+  const expenses = allExpenses.filter((expense) => expense.budget_id === params.id);
+
+  return { budget, expenses, allExpenses }; // Pass allExpenses for calculations
 }
 
-// action
+// action for the budget page
 export async function budgetAction({ request }) {
   const data = await request.formData();
   const { _action, ...values } = Object.fromEntries(data);
 
+  // =============================================================
+  // UPDATED ACTION LOGIC
+  // =============================================================
+
   if (_action === "createExpense") {
     try {
-      createExpense({
+      // Use the new async createExpense helper
+      await createExpense({
         name: values.newExpense,
         amount: values.newExpenseAmount,
         budgetId: values.newExpenseBudget,
@@ -53,10 +65,8 @@ export async function budgetAction({ request }) {
 
   if (_action === "deleteExpense") {
     try {
-      deleteItem({
-        key: "expenses",
-        id: values.expenseId,
-      });
+      // Use the new async deleteExpense helper
+      await deleteExpense(values.expenseId);
       return toast.success("Expense deleted!");
     } catch (e) {
       throw new Error("There was a problem deleting your expense.");
@@ -65,20 +75,24 @@ export async function budgetAction({ request }) {
 }
 
 const BudgetPage = () => {
-  const { budget, expenses } = useLoaderData();
+  const { budget, expenses, allExpenses } = useLoaderData();
+
+  // We need to pass the full list of expenses to the budget item for correct calculation
+  const spent = calculateSpentByBudget(budget.id, allExpenses);
 
   return (
     <div
       className="grid-lg"
       style={{
-        "--accent": budget.color,
+        "--accent": `hsl(${budget.color})`,
       }}
     >
       <h1 className="h2">
         <span className="accent">{budget.name}</span> Overview
       </h1>
       <div className="flex-lg">
-        <BudgetItem budget={budget} showDelete={true} />
+        {/* Pass the calculated spent amount to the BudgetItem */}
+        <BudgetItem budget={{ ...budget, spent }} showDelete={true} />
         <AddExpenseForm budgets={[budget]} />
       </div>
       {expenses && expenses.length > 0 && (
@@ -92,4 +106,5 @@ const BudgetPage = () => {
     </div>
   );
 };
+
 export default BudgetPage;

@@ -1,3 +1,5 @@
+// src/components/BudgetItem.jsx
+
 // rrd imports
 import { Form, Link } from "react-router-dom";
 
@@ -6,20 +8,26 @@ import { BanknotesIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 // helper functions
 import {
-  calculateSpentByBudget,
   formatCurrency,
   formatPercentage,
 } from "../helpers";
 
+// NOTE: This component is now "dumb." It no longer calculates the spent amount.
+// It expects the `spent` value to be provided in the `budget` prop.
+
 const BudgetItem = ({ budget, showDelete = false }) => {
   const { id, name, amount, color } = budget;
-  const spent = calculateSpentByBudget(id);
+  
+  // The 'spent' value is now read directly from the prop.
+  // We use `?? 0` as a safeguard in case `spent` is undefined.
+  const spent = budget.spent ?? 0;
 
   return (
     <div
       className="budget"
       style={{
-        "--accent": color,
+        // Use HSL color stored in the budget
+        "--accent": `hsl(${color})`,
       }}
     >
       <div className="progress-text">
@@ -37,7 +45,7 @@ const BudgetItem = ({ budget, showDelete = false }) => {
         <div className="flex-sm">
           <Form
             method="post"
-            action="delete"
+            action={`/budget/${id}/delete`}
             onSubmit={(event) => {
               if (
                 !confirm(

@@ -1,35 +1,19 @@
-// rrd import
+import { toast } from "react-toastify";
 import { redirect } from "react-router-dom";
 
-// library
-import { toast } from "react-toastify";
+// Import your new Supabase helper
+import { deleteBudget as deleteBudgetFromDb } from "../helpers";
 
-// helpers
-import { deleteItem, getAllMatchingItems } from "../helpers";
-
-export function deleteBudget({ params }) {
+export async function deleteBudget({ params }) {
   try {
-    deleteItem({
-      key: "budgets",
-      id: params.id,
-    });
-
-    const associatedExpenses = getAllMatchingItems({
-      category: "expenses",
-      key: "budgetId",
-      value: params.id,
-    });
-
-    associatedExpenses.forEach((expense) => {
-      deleteItem({
-        key: "expenses",
-        id: expense.id,
-      });
-    });
+    // We only need to delete the budget. Supabase handles the expenses.
+    await deleteBudgetFromDb(params.id);
 
     toast.success("Budget deleted successfully!");
   } catch (e) {
     throw new Error("There was a problem deleting your budget.");
   }
+
+  // Redirect to the dashboard after deletion
   return redirect("/");
 }
