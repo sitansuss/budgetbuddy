@@ -1,33 +1,21 @@
 // src/components/BudgetItem.jsx
 
-// rrd imports
 import { Form, Link } from "react-router-dom";
-
-// library imports
 import { BanknotesIcon, TrashIcon } from "@heroicons/react/24/outline";
-
-// helper functions
-import {
-  formatCurrency,
-  formatPercentage,
-} from "../helpers";
-
-// NOTE: This component is now "dumb." It no longer calculates the spent amount.
-// It expects the `spent` value to be provided in the `budget` prop.
+import { formatCurrency, formatPercentage } from "../helpers";
 
 const BudgetItem = ({ budget, showDelete = false }) => {
-  const { id, name, amount, color } = budget;
-  
-  // The 'spent' value is now read directly from the prop.
-  // We use `?? 0` as a safeguard in case `spent` is undefined.
-  const spent = budget.spent ?? 0;
+  const { id, name, amount, color, spent } = budget;
+  const remaining = amount - spent;
 
   return (
+    // FIX: A CSS variable `--accent` is set here. Its value is the unique HSL
+    // color string for this specific budget. Any CSS rule for a child of
+    // this div can now use var(--accent) to get this color.
     <div
       className="budget"
       style={{
-        // Use HSL color stored in the budget
-        "--accent": `hsl(${color})`,
+        "--accent": `hsl(${color})`
       }}
     >
       <div className="progress-text">
@@ -39,19 +27,15 @@ const BudgetItem = ({ budget, showDelete = false }) => {
       </progress>
       <div className="progress-text">
         <small>{formatCurrency(spent)} spent</small>
-        <small>{formatCurrency(amount - spent)} remaining</small>
+        <small>{formatCurrency(remaining < 0 ? 0 : remaining)} remaining</small>
       </div>
       {showDelete ? (
         <div className="flex-sm">
           <Form
             method="post"
-            action={`/budget/${id}/delete`}
+            action="delete"
             onSubmit={(event) => {
-              if (
-                !confirm(
-                  "Are you sure you want to permanently delete this budget?"
-                )
-              ) {
+              if (!confirm("Are you sure you want to permanently delete this budget?")) {
                 event.preventDefault();
               }
             }}
@@ -73,4 +57,5 @@ const BudgetItem = ({ budget, showDelete = false }) => {
     </div>
   );
 };
+
 export default BudgetItem;

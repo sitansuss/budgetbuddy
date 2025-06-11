@@ -16,6 +16,7 @@ import {
   createExpense,
   deleteExpense,
   waait,
+  calculateSpentByBudget,
 } from "./helpers";
 
 // Layouts, Pages, and Actions
@@ -26,17 +27,31 @@ import Dashboard from "./pages/Dashboard";
 import ErrorPage from "./pages/Error";
 import BudgetPage, { budgetAction, budgetLoader } from "./pages/BudgetPage";
 import ExpensesPage, { expensesAction, expensesLoader } from "./pages/ExpensesPage";
-
-// Import the separate Login and Signup pages and their respective actions
 import LoginPage, { loginAction } from "./pages/LoginPage";
 import SignupPage, { signupAction } from "./pages/SignupPage";
 
 // Dashboard Loader & Action
 export async function dashboardLoader() {
-  const budgets = await getBudgets();
-  const expenses = await getExpenses();
   const { data: { session } } = await supabase.auth.getSession();
   const userName = session?.user?.user_metadata?.userName;
+
+  const budgetsRaw = await getBudgets();
+  const expensesRaw = await getExpenses();
+
+  const budgets = budgetsRaw.map(budget => {
+    const spent = calculateSpentByBudget(budget.id, expensesRaw);
+    return { ...budget, spent };
+  });
+
+  // UPDATE: Attach the budget object and then filter out any expenses
+  // where the budget couldn't be found. This prevents the crash.
+  const expenses = expensesRaw
+    .map(expense => {
+      const budget = budgets.find(b => b.id === expense.budget_id);
+      return { ...expense, budget };
+    })
+    .filter(expense => expense.budget); // This line removes any expense with an undefined budget.
+
   return { userName, budgets, expenses };
 }
 
@@ -69,9 +84,12 @@ export async function dashboardAction({ request }) {
         name: values.newExpense,
         amount: values.newExpenseAmount,
         budgetId: values.newExpenseBudget,
+        expenseDate: values.newExpenseDate,
       });
       return toast.success(`Expense ${values.newExpense} created!`);
-    } catch (e) { throw new Error("There was a problem creating your expense."); }
+    } catch (e) {
+      throw new Error("There was a problem creating your expense.");
+    }
   }
   if (_action === "deleteExpense") {
     try {

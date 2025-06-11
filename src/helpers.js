@@ -47,6 +47,7 @@ export const getBudgets = async () => {
 
 /**
  * Fetches all expenses for the currently logged-in user.
+ * UPDATE: Now sorts by the new 'expense_date' for correct chronological order.
  */
 export const getExpenses = async () => {
   const user = await getCurrentUser();
@@ -54,7 +55,7 @@ export const getExpenses = async () => {
     .from('expenses')
     .select('*')
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+    .order('expense_date', { ascending: false }); // Sort by the user-set date
     
   if (error) {
     console.error("Supabase getExpenses error:", error);
@@ -89,17 +90,22 @@ export const createBudget = async ({ name, amount, existingBudgetsCount }) => {
 
 /**
  * Creates a new expense for the currently logged-in user.
+ * UPDATE: Now accepts and saves a custom expenseDate.
  */
-export const createExpense = async ({ name, amount, budgetId }) => {
+export const createExpense = async ({ name, amount, budgetId, expenseDate }) => {
   const user = await getCurrentUser();
   const newItem = {
     name,
     amount: +amount,
-    budget_id: budgetId, // Using snake_case to match the database column
+    budget_id: budgetId, // Using your existing snake_case
     user_id: user.id,
+    
+    // If a custom expenseDate is provided, use it.
+    // Otherwise, default to the current time.
+    // .toISOString() is the standard format for sending dates to Supabase.
+    expense_date: expenseDate ? new Date(expenseDate).toISOString() : new Date().toISOString(),
   };
 
-  // Insert the new item without asking for it to be returned
   const { error } = await supabase.from('expenses').insert([newItem]);
 
   if (error) {
@@ -150,7 +156,6 @@ export const deleteBudget = async (id) => {
 
 export const calculateSpentByBudget = (budgetId, allExpenses) => {
   return allExpenses?.reduce((acc, expense) => {
-    // Check against the snake_case property
     if (expense.budget_id !== budgetId) return acc;
     return (acc += expense.amount);
   }, 0) ?? 0;

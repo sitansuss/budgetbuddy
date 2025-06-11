@@ -1,15 +1,9 @@
 // src/components/ExpenseItem.jsx
 
-// rrd imports
 import { Link, Form } from "react-router-dom";
-
-// library
 import { TrashIcon } from "@heroicons/react/24/solid";
-
-// helpers
 import { formatCurrency, formatDateToLocaleString } from "../helpers";
 
-// This component now expects the 'expense' object to have a 'budget' property nested inside.
 const ExpenseItem = ({ expense, showBudget = true }) => {
   const { budget } = expense;
 
@@ -17,22 +11,20 @@ const ExpenseItem = ({ expense, showBudget = true }) => {
     <>
       <td>{expense.name}</td>
       <td>{formatCurrency(expense.amount)}</td>
-      <td>{formatDateToLocaleString(expense.created_at)}</td>
+      <td>{formatDateToLocaleString(expense.expense_date)}</td>
+      
       {showBudget && (
         <td>
-          {/* Check if budget exists before trying to access its properties */}
           {budget ? (
             <Link
               to={`/budget/${budget.id}`}
-              style={{
-                // Use HSL color stored in the budget
-                "--accent": `hsl(${budget.color})`,
-              }}
+              // FIX: We now directly set the text color to the budget's color,
+              // making it clearly visible.
+              style={{ color: `hsl(${budget.color})` }}
             >
               {budget.name}
             </Link>
           ) : (
-            // Display a dash if for some reason the budget isn't found
             <span>-</span>
           )}
         </td>

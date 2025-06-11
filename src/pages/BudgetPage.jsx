@@ -1,43 +1,33 @@
-// rrd imports
-import { useLoaderData, Form } from "react-router-dom";
+// src/pages/BudgetPage.jsx
 
-// library
-import { toast } from "react-toastify";
-
-// components
-import BudgetItem from "../components/BudgetItem";
+import { useLoaderData } from "react-router-dom";
 import AddExpenseForm from "../components/AddExpenseForm";
+import BudgetItem from "../components/BudgetItem";
 import Table from "../components/Table";
-
-// helpers
-// =============================================================
-// UPDATED IMPORTS: Use the new async helpers
-// =============================================================
-import {
-  createExpense,
-  deleteExpense,
-  getBudgets,
-  getExpenses,
-  calculateSpentByBudget,
-} from "../helpers";
+import { createExpense, deleteExpense, getBudgets, getExpenses, calculateSpentByBudget } from "../helpers";
+import { toast } from "react-toastify";
 
 // loader for the budget page
 export async function budgetLoader({ params }) {
-  // Fetch all data required for this page
   const allBudgets = await getBudgets();
   const allExpenses = await getExpenses();
 
-  // Find the specific budget for this page
-  const budget = allBudgets.find((b) => b.id === params.id);
+  const budgetRaw = allBudgets.find((b) => b.id === params.id);
 
-  if (!budget) {
+  if (!budgetRaw) {
     throw new Error("The budget you’re trying to find doesn’t exist");
   }
 
-  // Filter expenses to only those that belong to this budget
-  const expenses = allExpenses.filter((expense) => expense.budget_id === params.id);
+  // UPDATE: Calculate the spent amount for this specific budget
+  const spent = calculateSpentByBudget(budgetRaw.id, allExpenses);
+  const budget = { ...budgetRaw, spent };
 
-  return { budget, expenses, allExpenses }; // Pass allExpenses for calculations
+  // Filter expenses for this page and attach budget info
+  const expenses = allExpenses
+    .filter((expense) => expense.budget_id === params.id)
+    .map(expense => ({ ...expense, budget: budgetRaw })); // Add budget info for consistency
+
+  return { budget, expenses };
 }
 
 // action for the budget page
@@ -45,17 +35,13 @@ export async function budgetAction({ request }) {
   const data = await request.formData();
   const { _action, ...values } = Object.fromEntries(data);
 
-  // =============================================================
-  // UPDATED ACTION LOGIC
-  // =============================================================
-
   if (_action === "createExpense") {
     try {
-      // Use the new async createExpense helper
       await createExpense({
         name: values.newExpense,
         amount: values.newExpenseAmount,
         budgetId: values.newExpenseBudget,
+        expenseDate: values.newExpenseDate,
       });
       return toast.success(`Expense ${values.newExpense} created!`);
     } catch (e) {
@@ -65,7 +51,6 @@ export async function budgetAction({ request }) {
 
   if (_action === "deleteExpense") {
     try {
-      // Use the new async deleteExpense helper
       await deleteExpense(values.expenseId);
       return toast.success("Expense deleted!");
     } catch (e) {
@@ -75,10 +60,7 @@ export async function budgetAction({ request }) {
 }
 
 const BudgetPage = () => {
-  const { budget, expenses, allExpenses } = useLoaderData();
-
-  // We need to pass the full list of expenses to the budget item for correct calculation
-  const spent = calculateSpentByBudget(budget.id, allExpenses);
+  const { budget, expenses } = useLoaderData();
 
   return (
     <div
@@ -91,8 +73,7 @@ const BudgetPage = () => {
         <span className="accent">{budget.name}</span> Overview
       </h1>
       <div className="flex-lg">
-        {/* Pass the calculated spent amount to the BudgetItem */}
-        <BudgetItem budget={{ ...budget, spent }} showDelete={true} />
+        <BudgetItem budget={budget} showDelete={true} />
         <AddExpenseForm budgets={[budget]} />
       </div>
       {expenses && expenses.length > 0 && (
