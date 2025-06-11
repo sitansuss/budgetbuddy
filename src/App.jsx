@@ -26,7 +26,10 @@ import Dashboard from "./pages/Dashboard";
 import ErrorPage from "./pages/Error";
 import BudgetPage, { budgetAction, budgetLoader } from "./pages/BudgetPage";
 import ExpensesPage, { expensesAction, expensesLoader } from "./pages/ExpensesPage";
-import AuthPage, { authAction } from "./pages/AuthPage";
+
+// Import the separate Login and Signup pages and their respective actions
+import LoginPage, { loginAction } from "./pages/LoginPage";
+import SignupPage, { signupAction } from "./pages/SignupPage";
 
 // Dashboard Loader & Action
 export async function dashboardLoader() {
@@ -104,12 +107,8 @@ const router = createBrowserRouter([
         index: true,
         element: <Dashboard />,
         loader: async () => {
-          // FIX: Check the result of the protectedLoader
           const protection = await protectedLoader();
-          if (protection) {
-            return protection; // Return the redirect immediately if it exists
-          }
-          // Otherwise, continue to the normal loader
+          if (protection) return protection;
           return dashboardLoader();
         },
         action: dashboardAction,
@@ -117,15 +116,20 @@ const router = createBrowserRouter([
       },
       {
         path: "login",
-        element: <AuthPage />,
-        action: authAction,
+        element: <LoginPage />,
+        action: loginAction,
+        loader: publicLoader,
+      },
+      {
+        path: "signup",
+        element: <SignupPage />,
+        action: signupAction,
         loader: publicLoader,
       },
       {
         path: "budget/:id",
         element: <BudgetPage />,
         loader: async ({ params }) => {
-          // FIX: Apply the same protection pattern here
           const protection = await protectedLoader();
           if (protection) return protection;
           return budgetLoader({ params });
@@ -143,7 +147,6 @@ const router = createBrowserRouter([
         path: "expenses",
         element: <ExpensesPage />,
         loader: async () => {
-          // FIX: And here too
           const protection = await protectedLoader();
           if (protection) return protection;
           return expensesLoader();

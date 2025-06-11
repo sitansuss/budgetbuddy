@@ -1,6 +1,7 @@
 // src/pages/LoginPage.jsx
 
-import { Form, Link, useNavigation } from "react-router-dom";
+// FIX: Import 'redirect' from react-router-dom
+import { Form, Link, useNavigation, useActionData, redirect } from "react-router-dom";
 import { toast } from "react-toastify";
 import { supabase } from "../supabaseClient";
 
@@ -13,15 +14,18 @@ export async function loginAction({ request }) {
 
   if (error) {
     toast.error(error.message);
+    // Keep this! Returning the error is great for displaying it in the UI.
     return { error: error.message };
   }
   
-  // A successful login is handled by the onAuthStateChange listener
-  return toast.success("Logged in successfully!");
+  // FIX: On success, redirect the user to the dashboard.
+  toast.success("Logged in successfully!");
+  return redirect("/");
 }
 
 const LoginPage = () => {
   const navigation = useNavigation();
+  const actionData = useActionData(); // You can use this to display the error message
   const isSubmitting = navigation.state === "submitting";
 
   return (
@@ -38,6 +42,9 @@ const LoginPage = () => {
           <label htmlFor="password">Password</label>
           <input type="password" name="password" id="password" required />
         </div>
+
+        {/* This is how you can display the error from the action */}
+        {actionData?.error && <p style={{color: 'hsl(var(--warning))'}}>{actionData.error}</p>}
         
         <button type="submit" className="btn btn--dark" disabled={isSubmitting}>
           {isSubmitting ? "Logging in..." : "Login"}
