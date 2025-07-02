@@ -1,6 +1,6 @@
 // App.jsx
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, redirect } from "react-router-dom";
 
 // Library
@@ -30,10 +30,31 @@ import ExpensesPage, { expensesAction, expensesLoader } from "./pages/ExpensesPa
 import LoginPage, { loginAction } from "./pages/LoginPage";
 import SignupPage, { signupAction } from "./pages/SignupPage";
 
-// Dashboard Loader & Action
-export async function dashboardLoader() {
+// =============================================================
+// LOADER & ACTION DEFINITIONS
+// =============================================================
+
+// Auth Loaders
+const protectedLoader = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return redirect("/login");
+  }
+  return null;
+};
+
+const publicLoader = async () => {
   const { data: { session } } = await supabase.auth.getSession();
-  const userName = session?.user?.user_metadata?.userName;
+  if (session) {
+    return redirect("/");
+  }
+  return null;
+};
+
+// Dashboard Loader
+export async function dashboardLoader() {
+  const { data: { user } } = await supabase.auth.getUser();
+  const userName = user?.user_metadata?.userName;
 
   const budgetsRaw = await getBudgets();
   const expensesRaw = await getExpenses();
@@ -43,18 +64,17 @@ export async function dashboardLoader() {
     return { ...budget, spent };
   });
 
-  // UPDATE: Attach the budget object and then filter out any expenses
-  // where the budget couldn't be found. This prevents the crash.
   const expenses = expensesRaw
     .map(expense => {
       const budget = budgets.find(b => b.id === expense.budget_id);
       return { ...expense, budget };
     })
-    .filter(expense => expense.budget); // This line removes any expense with an undefined budget.
+    .filter(expense => expense.budget);
 
   return { userName, budgets, expenses };
 }
 
+// Dashboard Action
 export async function dashboardAction({ request }) {
   await waait();
   const data = await request.formData();
@@ -87,9 +107,7 @@ export async function dashboardAction({ request }) {
         expenseDate: values.newExpenseDate,
       });
       return toast.success(`Expense ${values.newExpense} created!`);
-    } catch (e) {
-      throw new Error("There was a problem creating your expense.");
-    }
+    } catch (e) { throw new Error("There was a problem creating your expense."); }
   }
   if (_action === "deleteExpense") {
     try {
@@ -99,19 +117,6 @@ export async function dashboardAction({ request }) {
   }
   return null;
 }
-
-// Auth Loaders
-const protectedLoader = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) return redirect("/login");
-  return null;
-};
-
-const publicLoader = async () => {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) return redirect("/");
-  return null;
-};
 
 // Router Definition
 const router = createBrowserRouter([
@@ -125,8 +130,7 @@ const router = createBrowserRouter([
         index: true,
         element: <Dashboard />,
         loader: async () => {
-          const protection = await protectedLoader();
-          if (protection) return protection;
+          await protectedLoader();
           return dashboardLoader();
         },
         action: dashboardAction,
@@ -148,8 +152,7 @@ const router = createBrowserRouter([
         path: "budget/:id",
         element: <BudgetPage />,
         loader: async ({ params }) => {
-          const protection = await protectedLoader();
-          if (protection) return protection;
+          await protectedLoader();
           return budgetLoader({ params });
         },
         action: budgetAction,
@@ -165,8 +168,7 @@ const router = createBrowserRouter([
         path: "expenses",
         element: <ExpensesPage />,
         loader: async () => {
-          const protection = await protectedLoader();
-          if (protection) return protection;
+          await protectedLoader();
           return expensesLoader();
         },
         action: expensesAction,
@@ -184,6 +186,40 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
+  const [authReady, setAuthReady] = useState(false);
+
+  useEffect(() => {
+    // Check the initial session state once when the app loads
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthReady(true);
+    });
+
+    // Listen for subsequent auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      // The `SIGNED_IN` event is now handled by the `loginAction` redirecting
+      // and the `publicLoader` preventing access to the login page.
+      // We no longer need a `window.location` reload here, which fixes the loop.
+
+      // We only need to handle a clean sign-out.
+      if (event === 'SIGNED_OUT') {
+        // A full page navigation to the login page is the simplest and most
+        // reliable way to clear all application state on logout.
+        window.location.href = '/login';
+      }
+    });
+
+    // Cleanup subscription on component unmount
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Do not render the router until the initial Supabase session check is complete.
+  // This prevents loaders from running before the auth state is known.
+  if (!authReady) {
+    return null;
+  }
+
   return (
     <div className="App">
       <RouterProvider router={router} />
